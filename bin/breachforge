@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+COMMAND="${1:-help}"
+
+case "$COMMAND" in
+    help)
+        echo "BreachForge - Local Linux SOC Cyber-Range"
+        echo
+        echo "Usage:"
+        echo "  breachforge <command>"
+        echo
+        echo "Commands:"
+        echo "  help          Show this help message"
+        echo "  status        Show BreachForge status"
+        echo "  attack        Run attack simulations"
+        echo "  detect        Run detection engine"
+        echo "  investigate   Investigate an incident"
+        echo "  respond       Execute response actions"
+        echo "  recover       Verify system recovery"
+        echo "  report        Generate incident report"
+        ;;
+
+    status)
+        echo "[INFO] BreachForge status"
+        echo "[INFO] CLI is operational"
+        ;;
+
+    attack)
+        echo "[INFO] Attack module not implemented yet"
+        ;;
+
+    detect)
+        echo "[INFO] Detection engine not implemented yet"
+        ;;
+
+    investigate)
+        echo "[INFO] Investigation engine not implemented yet"
+        ;;
+
+    respond)
+        echo "[INFO] Response engine not implemented yet"
+        ;;
+
+    recover)
+        echo "[INFO] Recovery engine not implemented yet"
+        ;;
+
+    report)
+        echo "[INFO] Reporting engine not implemented yet"
+        ;;
+
+    *)
+        echo "[ERROR] Unknown command: $COMMAND"
+        echo "Run 'breachforge help' for available commands."
+        exit 1
+        ;;
+esac
