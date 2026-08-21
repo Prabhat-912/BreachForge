@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Logs
+*.log
+
+# Runtime state
+*.pid
+*.sock
+
+# Temporary files
+*.tmp
+
+# Environment / secrets
+.env
+.env.*
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# BreachForge runtime artifacts
+runtime/
+lab/runtime/
