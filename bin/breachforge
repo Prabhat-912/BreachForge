@@ -36,7 +36,8 @@ case "$COMMAND" in
         ;;
 
     detect)
-        echo "[INFO] Detection engine not implemented yet"
+        echo "[INFO] Starting detection engine..."
+	"$PROJECT_ROOT/detection/bruteforce_detector.sh"
         ;;
 
     investigate)
