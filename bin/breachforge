@@ -41,7 +41,8 @@ case "$COMMAND" in
         ;;
 
     investigate)
-        echo "[INFO] Investigation engine not implemented yet"
+        echo "[INFO] Starting investigation engine..."
+	"$PROJECT_ROOT/investigation/investigate_bruteforce.sh"
         ;;
 
     respond)

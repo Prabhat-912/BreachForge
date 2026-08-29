@@ -5,6 +5,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI="$PROJECT_ROOT/bin/breachforge"
 LOG_FILE="$PROJECT_ROOT/logs/auth.log"
+EVIDENCE_FILE="$PROJECT_ROOT/evidence/bruteforce_incident.txt"
 
 PASS=0
 FAIL=0
@@ -38,6 +39,10 @@ echo "BreachForge CLI Test Suite"
 echo "=========================="
 echo
 
+# --------------------------------------------------
+# CLI Tests
+# --------------------------------------------------
+
 run_test "Help command" 0 "$CLI" help
 run_test "Status command" 0 "$CLI" status
 run_test "Investigate command" 0 "$CLI" investigate
@@ -47,6 +52,10 @@ run_test "Report command" 0 "$CLI" report
 run_test "Invalid command" 1 "$CLI" invalid-command
 
 echo
+
+# --------------------------------------------------
+# Attack Simulation Tests
+# --------------------------------------------------
 
 echo "[TEST] Attack simulation"
 
@@ -80,6 +89,10 @@ else
 fi
 
 echo
+
+# --------------------------------------------------
+# Detection Engine Tests
+# --------------------------------------------------
 
 echo "[TEST] Detection engine"
 
@@ -122,6 +135,72 @@ else
 fi
 
 echo
+
+# --------------------------------------------------
+# Investigation Engine Tests
+# --------------------------------------------------
+
+echo "[TEST] Investigation engine"
+
+rm -f "$EVIDENCE_FILE"
+
+INVESTIGATION_OUTPUT="$("$CLI" investigate 2>&1)"
+
+if [[ "$INVESTIGATION_OUTPUT" == *"[SUCCESS] Investigation completed."* ]]; then
+    echo "[PASS] Investigation completed"
+    ((PASS+=1))
+else
+    echo "[FAIL] Investigation completed"
+    echo "$INVESTIGATION_OUTPUT"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$EVIDENCE_FILE" ]]; then
+    echo "[PASS] Investigation evidence created"
+    ((PASS+=1))
+else
+    echo "[FAIL] Investigation evidence created"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Incident Type: SSH_BRUTE_FORCE" "$EVIDENCE_FILE"; then
+    echo "[PASS] Incident type recorded"
+    ((PASS+=1))
+else
+    echo "[FAIL] Incident type recorded"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Source IP: 192.168.1.50" "$EVIDENCE_FILE"; then
+    echo "[PASS] Source IP recorded"
+    ((PASS+=1))
+else
+    echo "[FAIL] Source IP recorded"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Target User: admin" "$EVIDENCE_FILE"; then
+    echo "[PASS] Target user recorded"
+    ((PASS+=1))
+else
+    echo "[FAIL] Target user recorded"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Severity: HIGH" "$EVIDENCE_FILE"; then
+    echo "[PASS] Severity recorded"
+    ((PASS+=1))
+else
+    echo "[FAIL] Severity recorded"
+    ((FAIL+=1))
+fi
+
+echo
+
+# --------------------------------------------------
+# Test Summary
+# --------------------------------------------------
+
 echo "=========================="
 echo "Passed: $PASS"
 echo "Failed: $FAIL"
