@@ -2,9 +2,12 @@
 
 set -euo pipefail
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 COMMAND="${1:-help}"
 
 case "$COMMAND" in
+
     help)
         echo "BreachForge - Local Linux SOC Cyber-Range"
         echo
@@ -28,7 +31,8 @@ case "$COMMAND" in
         ;;
 
     attack)
-        echo "[INFO] Attack module not implemented yet"
+        echo "[INFO] Starting attack simulation..."
+        "$PROJECT_ROOT/attacks/bruteforce.sh"
         ;;
 
     detect)
@@ -56,4 +60,5 @@ case "$COMMAND" in
         echo "Run 'breachforge help' for available commands."
         exit 1
         ;;
+
 esac
