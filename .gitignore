@@ -41,3 +41,4 @@ lab/runtime/
 evidence/
 response/response.log
 recovery/recovery.log
+reports/*.txt

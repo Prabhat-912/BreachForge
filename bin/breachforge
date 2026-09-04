@@ -56,7 +56,9 @@ case "$COMMAND" in
         ;;
 
     report)
-        echo "[INFO] Reporting engine not implemented yet"
+        echo "[INFO] Starting reporting engine..."
+	"$PROJECT_ROOT/reports/generate_bruteforce_report.sh"
+
         ;;
 
     *)

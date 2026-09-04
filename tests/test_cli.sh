@@ -302,6 +302,86 @@ else
     ((FAIL+=1))
 fi
 
+# --------------------------------------------------
+# Report Engine Tests
+# --------------------------------------------------
+
+echo
+echo "[TEST] Report engine"
+
+REPORT_FILE="$PROJECT_ROOT/reports/bruteforce_incident_report.txt"
+
+if [[ -f "$REPORT_FILE" ]]; then
+    echo "[PASS] Incident report created"
+    ((PASS+=1))
+else
+    echo "[FAIL] Incident report created"
+    ((FAIL+=1))
+fi
+
+if grep -q "Incident Type: SSH_BRUTE_FORCE" "$REPORT_FILE"; then
+    echo "[PASS] Incident type recorded in report"
+    ((PASS+=1))
+else
+    echo "[FAIL] Incident type recorded in report"
+    ((FAIL+=1))
+fi
+
+if grep -q "Severity: HIGH" "$REPORT_FILE"; then
+    echo "[PASS] Severity recorded in report"
+    ((PASS+=1))
+else
+    echo "[FAIL] Severity recorded in report"
+    ((FAIL+=1))
+fi
+
+if grep -q "Source IP: 192.168.1.50" "$REPORT_FILE"; then
+    echo "[PASS] Source IP recorded in report"
+    ((PASS+=1))
+else
+    echo "[FAIL] Source IP recorded in report"
+    ((FAIL+=1))
+fi
+
+if grep -q "Target User: admin" "$REPORT_FILE"; then
+    echo "[PASS] Target user recorded in report"
+    ((PASS+=1))
+else
+    echo "[FAIL] Target user recorded in report"
+    ((FAIL+=1))
+fi
+
+if grep -q "Failed Attempts: 5" "$REPORT_FILE"; then
+    echo "[PASS] Failed attempt count recorded in report"
+    ((PASS+=1))
+else
+    echo "[FAIL] Failed attempt count recorded in report"
+    ((FAIL+=1))
+fi
+
+if grep -q "Response Action: BLOCK_SOURCE_IP" "$REPORT_FILE"; then
+    echo "[PASS] Response action recorded in report"
+    ((PASS+=1))
+else
+    echo "[FAIL] Response action recorded in report"
+    ((FAIL+=1))
+fi
+
+if grep -q "Recovery Status: RECOVERED" "$REPORT_FILE"; then
+    echo "[PASS] Recovery status recorded in report"
+    ((PASS+=1))
+else
+    echo "[FAIL] Recovery status recorded in report"
+    ((FAIL+=1))
+fi
+
+if grep -q "INCIDENT RESOLVED" "$REPORT_FILE"; then
+    echo "[PASS] Final incident status recorded"
+    ((PASS+=1))
+else
+    echo "[FAIL] Final incident status recorded"
+    ((FAIL+=1))
+fi
 
 # --------------------------------------------------
 # Test Summary
