@@ -6,6 +6,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI="$PROJECT_ROOT/bin/breachforge"
 LOG_FILE="$PROJECT_ROOT/logs/auth.log"
 EVIDENCE_FILE="$PROJECT_ROOT/evidence/bruteforce_incident.txt"
+RESPONSE_FILE="$PROJECT_ROOT/response/response.log"
 
 PASS=0
 FAIL=0
@@ -192,6 +193,59 @@ if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Severity: HIGH" "$EVIDENCE_FILE"; then
     ((PASS+=1))
 else
     echo "[FAIL] Severity recorded"
+    ((FAIL+=1))
+fi
+
+echo
+
+# --------------------------------------------------
+# Response Engine Tests
+# --------------------------------------------------
+
+echo "[TEST] Response engine"
+
+rm -f "$RESPONSE_FILE"
+
+RESPONSE_OUTPUT="$("$CLI" respond 2>&1)"
+
+if [[ "$RESPONSE_OUTPUT" == *"[SUCCESS] Response completed."* ]]; then
+    echo "[PASS] Response completed"
+    ((PASS+=1))
+else
+    echo "[FAIL] Response completed"
+    echo "$RESPONSE_OUTPUT"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RESPONSE_FILE" ]]; then
+    echo "[PASS] Response record created"
+    ((PASS+=1))
+else
+    echo "[FAIL] Response record created"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RESPONSE_FILE" ]] && grep -q "Source IP: 192.168.1.50" "$RESPONSE_FILE"; then
+    echo "[PASS] Source IP recorded in response"
+    ((PASS+=1))
+else
+    echo "[FAIL] Source IP recorded in response"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RESPONSE_FILE" ]] && grep -q "Response Action: BLOCK_SOURCE_IP" "$RESPONSE_FILE"; then
+    echo "[PASS] Correct response action recorded"
+    ((PASS+=1))
+else
+    echo "[FAIL] Correct response action recorded"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RESPONSE_FILE" ]] && grep -q "Status: SIMULATED" "$RESPONSE_FILE"; then
+    echo "[PASS] Response marked as simulated"
+    ((PASS+=1))
+else
+    echo "[FAIL] Response marked as simulated"
     ((FAIL+=1))
 fi
 

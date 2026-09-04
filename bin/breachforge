@@ -37,16 +37,17 @@ case "$COMMAND" in
 
     detect)
         echo "[INFO] Starting detection engine..."
-	"$PROJECT_ROOT/detection/bruteforce_detector.sh"
+        "$PROJECT_ROOT/detection/bruteforce_detector.sh"
         ;;
 
     investigate)
         echo "[INFO] Starting investigation engine..."
-	"$PROJECT_ROOT/investigation/investigate_bruteforce.sh"
+        "$PROJECT_ROOT/investigation/investigate_bruteforce.sh"
         ;;
 
     respond)
-        echo "[INFO] Response engine not implemented yet"
+        echo "[INFO] Starting response engine..."
+        "$PROJECT_ROOT/response/respond_bruteforce.sh"
         ;;
 
     recover)
