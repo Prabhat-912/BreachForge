@@ -4,74 +4,94 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI="$PROJECT_ROOT/bin/breachforge"
+
 LOG_FILE="$PROJECT_ROOT/logs/auth.log"
 EVIDENCE_FILE="$PROJECT_ROOT/evidence/bruteforce_incident.txt"
 RESPONSE_FILE="$PROJECT_ROOT/response/response.log"
 RECOVERY_FILE="$PROJECT_ROOT/recovery/recovery.log"
+INCIDENT_FILE="$PROJECT_ROOT/data/incidents.db"
+REPORT_FILE="$PROJECT_ROOT/reports/bruteforce_incident_report.txt"
+
 PASS=0
 FAIL=0
+
+echo "BreachForge CLI Test Suite"
+echo "=========================="
 
 run_test() {
     local name="$1"
     local expected_exit="$2"
     shift 2
 
-    local output
-    local actual_exit
-
     set +e
-    output="$("$@" 2>&1)"
-    actual_exit=$?
+    OUTPUT=$("$@" 2>&1)
+    EXIT_CODE=$?
     set -e
 
-    if [[ "$actual_exit" -eq "$expected_exit" ]]; then
+    if [[ "$EXIT_CODE" -eq "$expected_exit" ]]; then
         echo "[PASS] $name"
         ((PASS+=1))
     else
         echo "[FAIL] $name"
         echo "       Expected exit: $expected_exit"
-        echo "       Actual exit:   $actual_exit"
-        echo "       Output: $output"
+        echo "       Actual exit:   $EXIT_CODE"
+        echo "       Output: $OUTPUT"
         ((FAIL+=1))
     fi
 }
 
-echo "BreachForge CLI Test Suite"
-echo "=========================="
+assert_contains() {
+    local name="$1"
+    local expected="$2"
+    local actual="$3"
+
+    if echo "$actual" | grep -q "$expected"; then
+        echo "[PASS] $name"
+        ((PASS+=1))
+    else
+        echo "[FAIL] $name"
+        echo "       Expected: $expected"
+        echo "       Actual:   $actual"
+        ((FAIL+=1))
+    fi
+}
+
+# Clean runtime files
+rm -f "$LOG_FILE"
+rm -f "$EVIDENCE_FILE"
+rm -f "$RESPONSE_FILE"
+rm -f "$RECOVERY_FILE"
+rm -f "$INCIDENT_FILE"
+rm -f "$REPORT_FILE"
+
+mkdir -p "$PROJECT_ROOT/data"
+mkdir -p "$PROJECT_ROOT/reports"
+
 echo
 
 # --------------------------------------------------
-# CLI Tests
+# Basic CLI tests
 # --------------------------------------------------
 
 run_test "Help command" 0 "$CLI" help
+
 run_test "Status command" 0 "$CLI" status
-run_test "Investigate command" 0 "$CLI" investigate
-run_test "Respond command" 0 "$CLI" respond
-run_test "Recover command" 0 "$CLI" recover
-run_test "Report command" 0 "$CLI" report
+
 run_test "Invalid command" 1 "$CLI" invalid-command
 
+# --------------------------------------------------
+# Attack simulation
+# --------------------------------------------------
+
 echo
-
-# --------------------------------------------------
-# Attack Simulation Tests
-# --------------------------------------------------
-
 echo "[TEST] Attack simulation"
 
-rm -f "$LOG_FILE"
+ATTACK_OUTPUT=$("$CLI" attack 2>&1)
 
-ATTACK_OUTPUT="$("$CLI" attack 2>&1)"
-
-if [[ "$ATTACK_OUTPUT" == *"[SUCCESS] Generated 5 failed SSH login events."* ]]; then
-    echo "[PASS] Attack simulation output"
-    ((PASS+=1))
-else
-    echo "[FAIL] Attack simulation output"
-    echo "$ATTACK_OUTPUT"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Attack simulation output" \
+    "Simulating SSH brute-force attack" \
+    "$ATTACK_OUTPUT"
 
 if [[ -f "$LOG_FILE" ]]; then
     echo "[PASS] Attack log created"
@@ -81,80 +101,75 @@ else
     ((FAIL+=1))
 fi
 
-if [[ -f "$LOG_FILE" ]] && [[ "$(grep -c "Failed password" "$LOG_FILE")" -eq 5 ]]; then
+FAILED_COUNT=$(grep -c "Failed password" "$LOG_FILE")
+
+if [[ "$FAILED_COUNT" -eq 5 ]]; then
     echo "[PASS] Five failed login events generated"
     ((PASS+=1))
 else
     echo "[FAIL] Five failed login events generated"
+    echo "       Expected: 5"
+    echo "       Actual:   $FAILED_COUNT"
     ((FAIL+=1))
 fi
 
+# --------------------------------------------------
+# Detection engine
+# --------------------------------------------------
+
 echo
-
-# --------------------------------------------------
-# Detection Engine Tests
-# --------------------------------------------------
-
 echo "[TEST] Detection engine"
 
-DETECT_OUTPUT="$("$CLI" detect 2>&1)"
+DETECT_OUTPUT=$("$CLI" detect 2>&1)
 
-if [[ "$DETECT_OUTPUT" == *"[ALERT] SSH brute-force attack detected!"* ]]; then
-    echo "[PASS] Brute-force attack detected"
+assert_contains \
+    "Brute-force attack detected" \
+    "SSH brute-force attack detected" \
+    "$DETECT_OUTPUT"
+
+assert_contains \
+    "Correct source IP detected" \
+    "Source IP: 192.168.1.50" \
+    "$DETECT_OUTPUT"
+
+assert_contains \
+    "Correct attempt count detected" \
+    "Failed attempts: 5" \
+    "$DETECT_OUTPUT"
+
+assert_contains \
+    "Correct severity detected" \
+    "Severity: HIGH" \
+    "$DETECT_OUTPUT"
+
+assert_contains \
+    "Incident ID created" \
+    "Incident ID: INC-001" \
+    "$DETECT_OUTPUT"
+
+if grep -q "^INC-001|SSH_BRUTE_FORCE|HIGH|192.168.1.50|admin|5|DETECTED$" "$INCIDENT_FILE"; then
+    echo "[PASS] Incident recorded as DETECTED"
     ((PASS+=1))
 else
-    echo "[FAIL] Brute-force attack detected"
-    echo "$DETECT_OUTPUT"
+    echo "[FAIL] Incident recorded as DETECTED"
     ((FAIL+=1))
 fi
 
-if [[ "$DETECT_OUTPUT" == *"[ALERT] Source IP: 192.168.1.50"* ]]; then
-    echo "[PASS] Correct source IP detected"
-    ((PASS+=1))
-else
-    echo "[FAIL] Correct source IP detected"
-    echo "$DETECT_OUTPUT"
-    ((FAIL+=1))
-fi
-
-if [[ "$DETECT_OUTPUT" == *"[ALERT] Failed attempts: 5"* ]]; then
-    echo "[PASS] Correct attempt count detected"
-    ((PASS+=1))
-else
-    echo "[FAIL] Correct attempt count detected"
-    echo "$DETECT_OUTPUT"
-    ((FAIL+=1))
-fi
-
-if [[ "$DETECT_OUTPUT" == *"[ALERT] Severity: HIGH"* ]]; then
-    echo "[PASS] Correct severity detected"
-    ((PASS+=1))
-else
-    echo "[FAIL] Correct severity detected"
-    echo "$DETECT_OUTPUT"
-    ((FAIL+=1))
-fi
+# --------------------------------------------------
+# Investigation engine
+# --------------------------------------------------
 
 echo
-
-# --------------------------------------------------
-# Investigation Engine Tests
-# --------------------------------------------------
-
 echo "[TEST] Investigation engine"
 
-rm -f "$EVIDENCE_FILE"
+run_test "Investigate command" 0 "$CLI" investigate
 
-INVESTIGATION_OUTPUT="$("$CLI" investigate 2>&1)"
+INVESTIGATE_OUTPUT=$("$CLI" investigate 2>&1)
 
-if [[ "$INVESTIGATION_OUTPUT" == *"[SUCCESS] Investigation completed."* ]]; then
-    echo "[PASS] Investigation completed"
-    ((PASS+=1))
-else
-    echo "[FAIL] Investigation completed"
-    echo "$INVESTIGATION_OUTPUT"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Investigation completed" \
+    "Investigation completed" \
+    "$INVESTIGATE_OUTPUT"
 
 if [[ -f "$EVIDENCE_FILE" ]]; then
     echo "[PASS] Investigation evidence created"
@@ -164,58 +179,54 @@ else
     ((FAIL+=1))
 fi
 
-if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Incident Type: SSH_BRUTE_FORCE" "$EVIDENCE_FILE"; then
-    echo "[PASS] Incident type recorded"
+assert_contains \
+    "Incident ID recorded in investigation" \
+    "Incident ID: INC-001" \
+    "$(cat "$EVIDENCE_FILE")"
+
+assert_contains \
+    "Incident type recorded" \
+    "Incident Type: SSH_BRUTE_FORCE" \
+    "$(cat "$EVIDENCE_FILE")"
+
+assert_contains \
+    "Source IP recorded" \
+    "Source IP: 192.168.1.50" \
+    "$(cat "$EVIDENCE_FILE")"
+
+assert_contains \
+    "Target user recorded" \
+    "Target User: admin" \
+    "$(cat "$EVIDENCE_FILE")"
+
+assert_contains \
+    "Severity recorded" \
+    "Severity: HIGH" \
+    "$(cat "$EVIDENCE_FILE")"
+
+if grep -q "^INC-001|SSH_BRUTE_FORCE|HIGH|192.168.1.50|admin|5|INVESTIGATING$" "$INCIDENT_FILE"; then
+    echo "[PASS] Incident status updated to INVESTIGATING"
     ((PASS+=1))
 else
-    echo "[FAIL] Incident type recorded"
+    echo "[FAIL] Incident status updated to INVESTIGATING"
     ((FAIL+=1))
 fi
 
-if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Source IP: 192.168.1.50" "$EVIDENCE_FILE"; then
-    echo "[PASS] Source IP recorded"
-    ((PASS+=1))
-else
-    echo "[FAIL] Source IP recorded"
-    ((FAIL+=1))
-fi
-
-if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Target User: admin" "$EVIDENCE_FILE"; then
-    echo "[PASS] Target user recorded"
-    ((PASS+=1))
-else
-    echo "[FAIL] Target user recorded"
-    ((FAIL+=1))
-fi
-
-if [[ -f "$EVIDENCE_FILE" ]] && grep -q "Severity: HIGH" "$EVIDENCE_FILE"; then
-    echo "[PASS] Severity recorded"
-    ((PASS+=1))
-else
-    echo "[FAIL] Severity recorded"
-    ((FAIL+=1))
-fi
+# --------------------------------------------------
+# Response engine
+# --------------------------------------------------
 
 echo
-
-# --------------------------------------------------
-# Response Engine Tests
-# --------------------------------------------------
-
 echo "[TEST] Response engine"
 
-rm -f "$RESPONSE_FILE"
+run_test "Respond command" 0 "$CLI" respond
 
-RESPONSE_OUTPUT="$("$CLI" respond 2>&1)"
+RESPONSE_OUTPUT=$("$CLI" respond 2>&1)
 
-if [[ "$RESPONSE_OUTPUT" == *"[SUCCESS] Response completed."* ]]; then
-    echo "[PASS] Response completed"
-    ((PASS+=1))
-else
-    echo "[FAIL] Response completed"
-    echo "$RESPONSE_OUTPUT"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Response completed" \
+    "Response completed" \
+    "$RESPONSE_OUTPUT"
 
 if [[ -f "$RESPONSE_FILE" ]]; then
     echo "[PASS] Response record created"
@@ -225,50 +236,49 @@ else
     ((FAIL+=1))
 fi
 
-if [[ -f "$RESPONSE_FILE" ]] && grep -q "Source IP: 192.168.1.50" "$RESPONSE_FILE"; then
-    echo "[PASS] Source IP recorded in response"
+assert_contains \
+    "Incident ID recorded in response" \
+    "Incident ID: INC-001" \
+    "$(cat "$RESPONSE_FILE")"
+
+assert_contains \
+    "Source IP recorded in response" \
+    "Source IP: 192.168.1.50" \
+    "$(cat "$RESPONSE_FILE")"
+
+assert_contains \
+    "Correct response action recorded" \
+    "Response Action: BLOCK_SOURCE_IP" \
+    "$(cat "$RESPONSE_FILE")"
+
+assert_contains \
+    "Response marked as simulated" \
+    "Status: SIMULATED" \
+    "$(cat "$RESPONSE_FILE")"
+
+if grep -q "^INC-001|SSH_BRUTE_FORCE|HIGH|192.168.1.50|admin|5|RESPONDED$" "$INCIDENT_FILE"; then
+    echo "[PASS] Incident status updated to RESPONDED"
     ((PASS+=1))
 else
-    echo "[FAIL] Source IP recorded in response"
+    echo "[FAIL] Incident status updated to RESPONDED"
     ((FAIL+=1))
 fi
 
-if [[ -f "$RESPONSE_FILE" ]] && grep -q "Response Action: BLOCK_SOURCE_IP" "$RESPONSE_FILE"; then
-    echo "[PASS] Correct response action recorded"
-    ((PASS+=1))
-else
-    echo "[FAIL] Correct response action recorded"
-    ((FAIL+=1))
-fi
-
-if [[ -f "$RESPONSE_FILE" ]] && grep -q "Status: SIMULATED" "$RESPONSE_FILE"; then
-    echo "[PASS] Response marked as simulated"
-    ((PASS+=1))
-else
-    echo "[FAIL] Response marked as simulated"
-    ((FAIL+=1))
-fi
+# --------------------------------------------------
+# Recovery engine
+# --------------------------------------------------
 
 echo
-
-# --------------------------------------------------
-# Recovery Engine Tests
-# --------------------------------------------------
-
 echo "[TEST] Recovery engine"
 
-rm -f "$RECOVERY_FILE"
+run_test "Recover command" 0 "$CLI" recover
 
-RECOVERY_OUTPUT="$("$CLI" recover 2>&1)"
+RECOVERY_OUTPUT=$("$CLI" recover 2>&1)
 
-if [[ "$RECOVERY_OUTPUT" == *"[SUCCESS] Recovery completed."* ]]; then
-    echo "[PASS] Recovery completed"
-    ((PASS+=1))
-else
-    echo "[FAIL] Recovery completed"
-    echo "$RECOVERY_OUTPUT"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Recovery completed" \
+    "Recovery completed" \
+    "$RECOVERY_OUTPUT"
 
 if [[ -f "$RECOVERY_FILE" ]]; then
     echo "[PASS] Recovery record created"
@@ -278,38 +288,44 @@ else
     ((FAIL+=1))
 fi
 
-if [[ -f "$RECOVERY_FILE" ]] && grep -q "Source IP: 192.168.1.50" "$RECOVERY_FILE"; then
-    echo "[PASS] Source IP recorded in recovery"
-    ((PASS+=1))
-else
-    echo "[FAIL] Source IP recorded in recovery"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Incident ID recorded in recovery" \
+    "Incident ID: INC-001" \
+    "$(cat "$RECOVERY_FILE")"
 
-if [[ -f "$RECOVERY_FILE" ]] && grep -q "Response Status: SIMULATED" "$RECOVERY_FILE"; then
-    echo "[PASS] Response status recorded"
-    ((PASS+=1))
-else
-    echo "[FAIL] Response status recorded"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Source IP recorded in recovery" \
+    "Source IP: 192.168.1.50" \
+    "$(cat "$RECOVERY_FILE")"
 
-if [[ -f "$RECOVERY_FILE" ]] && grep -q "Recovery Status: RECOVERED" "$RECOVERY_FILE"; then
-    echo "[PASS] Recovery marked as recovered"
+assert_contains \
+    "Response status recorded" \
+    "Response Status: SIMULATED" \
+    "$(cat "$RECOVERY_FILE")"
+
+assert_contains \
+    "Recovery marked as recovered" \
+    "Recovery Status: RECOVERED" \
+    "$(cat "$RECOVERY_FILE")"
+
+if grep -q "^INC-001|SSH_BRUTE_FORCE|HIGH|192.168.1.50|admin|5|RECOVERED$" "$INCIDENT_FILE"; then
+    echo "[PASS] Incident status updated to RECOVERED"
     ((PASS+=1))
 else
-    echo "[FAIL] Recovery marked as recovered"
+    echo "[FAIL] Incident status updated to RECOVERED"
     ((FAIL+=1))
 fi
 
 # --------------------------------------------------
-# Report Engine Tests
+# Report engine
 # --------------------------------------------------
 
 echo
 echo "[TEST] Report engine"
 
-REPORT_FILE="$PROJECT_ROOT/reports/bruteforce_incident_report.txt"
+run_test "Report command" 0 "$CLI" report
+
+REPORT_OUTPUT=$(cat "$REPORT_FILE")
 
 if [[ -f "$REPORT_FILE" ]]; then
     echo "[PASS] Incident report created"
@@ -319,72 +335,53 @@ else
     ((FAIL+=1))
 fi
 
-if grep -q "Incident Type: SSH_BRUTE_FORCE" "$REPORT_FILE"; then
-    echo "[PASS] Incident type recorded in report"
-    ((PASS+=1))
-else
-    echo "[FAIL] Incident type recorded in report"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Incident ID recorded in report" \
+    "Incident ID: INC-001" \
+    "$REPORT_OUTPUT"
 
-if grep -q "Severity: HIGH" "$REPORT_FILE"; then
-    echo "[PASS] Severity recorded in report"
-    ((PASS+=1))
-else
-    echo "[FAIL] Severity recorded in report"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Incident type recorded in report" \
+    "Incident Type: SSH_BRUTE_FORCE" \
+    "$REPORT_OUTPUT"
 
-if grep -q "Source IP: 192.168.1.50" "$REPORT_FILE"; then
-    echo "[PASS] Source IP recorded in report"
-    ((PASS+=1))
-else
-    echo "[FAIL] Source IP recorded in report"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Severity recorded in report" \
+    "Severity: HIGH" \
+    "$REPORT_OUTPUT"
 
-if grep -q "Target User: admin" "$REPORT_FILE"; then
-    echo "[PASS] Target user recorded in report"
-    ((PASS+=1))
-else
-    echo "[FAIL] Target user recorded in report"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Source IP recorded in report" \
+    "Source IP: 192.168.1.50" \
+    "$REPORT_OUTPUT"
 
-if grep -q "Failed Attempts: 5" "$REPORT_FILE"; then
-    echo "[PASS] Failed attempt count recorded in report"
-    ((PASS+=1))
-else
-    echo "[FAIL] Failed attempt count recorded in report"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Target user recorded in report" \
+    "Target User: admin" \
+    "$REPORT_OUTPUT"
 
-if grep -q "Response Action: BLOCK_SOURCE_IP" "$REPORT_FILE"; then
-    echo "[PASS] Response action recorded in report"
-    ((PASS+=1))
-else
-    echo "[FAIL] Response action recorded in report"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Failed attempt count recorded in report" \
+    "Failed Attempts: 5" \
+    "$REPORT_OUTPUT"
 
-if grep -q "Recovery Status: RECOVERED" "$REPORT_FILE"; then
-    echo "[PASS] Recovery status recorded in report"
-    ((PASS+=1))
-else
-    echo "[FAIL] Recovery status recorded in report"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Response action recorded in report" \
+    "Response Action: BLOCK_SOURCE_IP" \
+    "$REPORT_OUTPUT"
 
-if grep -q "INCIDENT RESOLVED" "$REPORT_FILE"; then
-    echo "[PASS] Final incident status recorded"
-    ((PASS+=1))
-else
-    echo "[FAIL] Final incident status recorded"
-    ((FAIL+=1))
-fi
+assert_contains \
+    "Recovery status recorded in report" \
+    "Recovery Status: RECOVERED" \
+    "$REPORT_OUTPUT"
+
+assert_contains \
+    "Final incident status recorded" \
+    "INCIDENT RESOLVED" \
+    "$REPORT_OUTPUT"
 
 # --------------------------------------------------
-# Test Summary
+# Summary
 # --------------------------------------------------
 
 echo "=========================="
@@ -392,8 +389,10 @@ echo "Passed: $PASS"
 echo "Failed: $FAIL"
 echo "=========================="
 
-if [[ "$FAIL" -ne 0 ]]; then
+if [[ "$FAIL" -eq 0 ]]; then
+    echo "All CLI tests passed."
+    exit 0
+else
+    echo "Some CLI tests failed."
     exit 1
 fi
-
-echo "All CLI tests passed."

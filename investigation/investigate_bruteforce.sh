@@ -8,6 +8,9 @@ LOG_FILE="$PROJECT_ROOT/logs/auth.log"
 EVIDENCE_DIR="$PROJECT_ROOT/evidence"
 EVIDENCE_FILE="$EVIDENCE_DIR/bruteforce_incident.txt"
 
+INCIDENT_MANAGER="$PROJECT_ROOT/data/incident_manager.sh"
+INCIDENT_FILE="$PROJECT_ROOT/data/incidents.db"
+
 THRESHOLD=5
 
 echo "[INFO] Starting investigation..."
@@ -16,6 +19,28 @@ if [[ ! -f "$LOG_FILE" ]]; then
     echo "[ERROR] Authentication log not found."
     exit 1
 fi
+
+if [[ ! -f "$INCIDENT_MANAGER" ]]; then
+    echo "[ERROR] Incident manager not found."
+    exit 1
+fi
+
+if [[ ! -f "$INCIDENT_FILE" ]]; then
+    echo "[ERROR] No incidents found."
+    echo "[INFO] Run './bin/breachforge detect' first."
+    exit 1
+fi
+
+source "$INCIDENT_MANAGER"
+
+INCIDENT_ID=$(tail -n 1 "$INCIDENT_FILE" | awk -F'|' '{print $1}')
+
+if [[ -z "$INCIDENT_ID" ]]; then
+    echo "[ERROR] Incident ID not found."
+    exit 1
+fi
+
+update_status "$INCIDENT_ID" "INVESTIGATING"
 
 mkdir -p "$EVIDENCE_DIR"
 
@@ -70,6 +95,7 @@ cat > "$EVIDENCE_FILE" <<EOF
 BreachForge Investigation Report
 ================================
 
+Incident ID: $INCIDENT_ID
 Incident Type: $INCIDENT_TYPE
 Severity: $SEVERITY
 
@@ -85,9 +111,11 @@ $LAST_EVENT
 EOF
 
 echo "[SUCCESS] Investigation completed."
+echo "[INFO] Incident ID: $INCIDENT_ID"
 echo "[INFO] Incident Type: $INCIDENT_TYPE"
 echo "[INFO] Source IP: $SOURCE_IP"
 echo "[INFO] Target User: $TARGET_USER"
 echo "[INFO] Failed Attempts: $ATTEMPT_COUNT"
 echo "[INFO] Severity: $SEVERITY"
+echo "[INFO] Status: INVESTIGATING"
 echo "[INFO] Evidence file: $EVIDENCE_FILE"

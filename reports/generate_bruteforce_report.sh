@@ -31,6 +31,8 @@ fi
 
 mkdir -p "$REPORT_DIR"
 
+INCIDENT_ID=$(grep "Incident ID:" "$RECOVERY_FILE" | awk '{print $3}')
+
 INCIDENT_TYPE=$(grep "Incident Type:" "$EVIDENCE_FILE" | head -n 1 | awk '{print $3}')
 SEVERITY=$(grep "Severity:" "$EVIDENCE_FILE" | head -n 1 | awk '{print $2}')
 SOURCE_IP=$(grep "Source IP:" "$EVIDENCE_FILE" | awk '{print $3}')
@@ -41,6 +43,11 @@ RESPONSE_ACTION=$(grep "Response Action:" "$RESPONSE_FILE" | awk '{print $3}')
 RESPONSE_STATUS=$(grep "Status:" "$RESPONSE_FILE" | awk '{print $2}')
 
 RECOVERY_STATUS=$(grep "Recovery Status:" "$RECOVERY_FILE" | awk '{print $3}')
+
+if [[ -z "$INCIDENT_ID" ]]; then
+    echo "[ERROR] Incident ID not found in recovery record."
+    exit 1
+fi
 
 if [[ -z "$INCIDENT_TYPE" || -z "$SEVERITY" || -z "$SOURCE_IP" ]]; then
     echo "[ERROR] Required investigation data not found."
@@ -69,6 +76,7 @@ BreachForge Incident Report
 
 Incident Summary
 ----------------
+Incident ID: $INCIDENT_ID
 Incident Type: $INCIDENT_TYPE
 Severity: $SEVERITY
 Source IP: $SOURCE_IP
@@ -90,6 +98,7 @@ $FINAL_STATUS
 EOF
 
 echo "[SUCCESS] Incident report generated."
+echo "[INFO] Incident ID: $INCIDENT_ID"
 echo "[INFO] Incident Type: $INCIDENT_TYPE"
 echo "[INFO] Source IP: $SOURCE_IP"
 echo "[INFO] Severity: $SEVERITY"
