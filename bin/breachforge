@@ -51,7 +51,8 @@ case "$COMMAND" in
         ;;
 
     recover)
-        echo "[INFO] Recovery engine not implemented yet"
+        echo "[INFO] Starting recovery engine..."
+        "$PROJECT_ROOT/recovery/recover_bruteforce.sh"
         ;;
 
     report)

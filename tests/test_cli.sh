@@ -7,7 +7,7 @@ CLI="$PROJECT_ROOT/bin/breachforge"
 LOG_FILE="$PROJECT_ROOT/logs/auth.log"
 EVIDENCE_FILE="$PROJECT_ROOT/evidence/bruteforce_incident.txt"
 RESPONSE_FILE="$PROJECT_ROOT/response/response.log"
-
+RECOVERY_FILE="$PROJECT_ROOT/recovery/recovery.log"
 PASS=0
 FAIL=0
 
@@ -250,6 +250,58 @@ else
 fi
 
 echo
+
+# --------------------------------------------------
+# Recovery Engine Tests
+# --------------------------------------------------
+
+echo "[TEST] Recovery engine"
+
+rm -f "$RECOVERY_FILE"
+
+RECOVERY_OUTPUT="$("$CLI" recover 2>&1)"
+
+if [[ "$RECOVERY_OUTPUT" == *"[SUCCESS] Recovery completed."* ]]; then
+    echo "[PASS] Recovery completed"
+    ((PASS+=1))
+else
+    echo "[FAIL] Recovery completed"
+    echo "$RECOVERY_OUTPUT"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RECOVERY_FILE" ]]; then
+    echo "[PASS] Recovery record created"
+    ((PASS+=1))
+else
+    echo "[FAIL] Recovery record created"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RECOVERY_FILE" ]] && grep -q "Source IP: 192.168.1.50" "$RECOVERY_FILE"; then
+    echo "[PASS] Source IP recorded in recovery"
+    ((PASS+=1))
+else
+    echo "[FAIL] Source IP recorded in recovery"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RECOVERY_FILE" ]] && grep -q "Response Status: SIMULATED" "$RECOVERY_FILE"; then
+    echo "[PASS] Response status recorded"
+    ((PASS+=1))
+else
+    echo "[FAIL] Response status recorded"
+    ((FAIL+=1))
+fi
+
+if [[ -f "$RECOVERY_FILE" ]] && grep -q "Recovery Status: RECOVERED" "$RECOVERY_FILE"; then
+    echo "[PASS] Recovery marked as recovered"
+    ((PASS+=1))
+else
+    echo "[FAIL] Recovery marked as recovered"
+    ((FAIL+=1))
+fi
+
 
 # --------------------------------------------------
 # Test Summary
